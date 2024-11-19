@@ -1,36 +1,49 @@
 import socket
 import hashlib
+import pickle
+import time
+# Constants (Use the actual IP of the receiver)
+RECEIVER_IP = '127.0.0.1'  # Receiver's IP (this laptop)
+RECEIVER_PORT = 8082  # Port the receiver listens on
 
-# Function to calculate checksum (hash) of the message
-def calculate_checksum(message):
-    return hashlib.sha256(message.encode()).hexdigest()
+# Function to compute checksum
+def compute_checksum(data):
+    return hashlib.md5(data.encode()).hexdigest()
 
-# Function for NIDS to detect tampering
-def nids_detect(message, received_checksum):
-    calculated_checksum = calculate_checksum(message)
-    if calculated_checksum == received_checksum:
-        print("NIDS: No tampering detected.")
-    else:
-        print("NIDS: Tampering detected! Message was altered.")
+# Integrity check function to validate received packets
+def check_packet_integrity(received_packet):
+    source_ip, destination_ip, port, delay_time, checksum, message = received_packet
+    print('time delay is ',time.time()-delay_time)
+    # Validate checksum
+    computed_checksum = compute_checksum(message)
 
-# Client B details
-client_b_ip = '127.0.0.1'
-client_b_port = 54321
+    if checksum != computed_checksum:
+        print("Checksum mismatch! Possible attack detected.")
+        return False
 
-# Create UDP socket for Client B
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((client_b_ip, client_b_port))
+    print("Packet is valid.")
+    return True
 
-# Receive message from Attacker (which was originally from Client A)
-data, addr = sock.recvfrom(1024)
-received_data = data.decode()
+# Receiver Class
+class Receiver:
+    def __init__(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((RECEIVER_IP, RECEIVER_PORT))
 
-# Extract message and checksum
-message, received_checksum = received_data.split('|')
-print(f"Client B: Received message -> {message}")
+    def receive_message(self):
+        while True:
+            data, addr = self.sock.recvfrom(1024)
+            received_packet = pickle.loads(data)
+            print(f"Received packet from {addr}: {received_packet}")
 
-# Run NIDS to check if the message has been tampered with
-nids_detect(message, received_checksum)
+            if check_packet_integrity(received_packet):
+                print("Message received:", received_packet[-1])
+            else:
+                print("Received an invalid packet. Data was tampered with!")
 
-# Close the socket
-sock.close()
+def main():
+    receiver = Receiver()
+    receiver.receive_message()
+
+if __name__ == "__main__":
+    main()

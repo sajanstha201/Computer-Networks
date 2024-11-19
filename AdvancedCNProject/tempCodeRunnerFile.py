@@ -1,0 +1,1 @@
+ # print(f"Generation {generation}: Best fitness = {fitness(best_individual)}")

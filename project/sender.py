@@ -1,27 +1,39 @@
 import socket
 import hashlib
+import pickle
+import time
 
-# Function to calculate checksum (hash) of the message
-def calculate_checksum(message):
-    return hashlib.sha256(message.encode()).hexdigest()
+# Constants (Use the actual IP of the attacker)
+SENDER_IP = '127.0.0.1'  # Sender's IP
+ATTACKER_IP = '127.0.0.1'  # Attacker's IP (not the receiver's)
+ATTACKER_PORT = 8081  # Port on the attacker
 
-# Client A details
-client_a_ip = '127.0.0.1'
-client_a_port = 12345
-attacker_ip = '127.0.0.1'  # Attacker IP (sending through Attacker)
-attacker_port = 40000
+# Function to compute checksum
+def compute_checksum(data):
+    return hashlib.md5(data.encode()).hexdigest()
 
-# Create UDP socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# Sender Class
+class Sender:
+    def __init__(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Message to send
-message = "Hello Client B, this is Client A."
-checksum = calculate_checksum(message)  # Calculate checksum (hash) for integrity check
-data_to_send = f"{message}|{checksum}"  # Append checksum to message
+    def send_message(self, message):
+        # Construct packet
+        source_ip = SENDER_IP
+        destination_ip = ATTACKER_IP  # Now sending to attacker
+        port = ATTACKER_PORT
+        delay_time = time.time()
+        checksum = compute_checksum(message)
 
-# Send message with checksum to Attacker
-sock.sendto(data_to_send.encode(), (attacker_ip, attacker_port))
-print(f"Client A: Sent message and checksum -> {data_to_send}")
+        packet = (source_ip, destination_ip, port, delay_time, checksum, message)
+        self.sock.sendto(pickle.dumps(packet), (destination_ip, port))
+        print(f"Sent to Attacker: {message}")
 
-# Close the socket
-sock.close()
+def main():
+    sender = Sender()
+    while True:
+        message = input("Enter message to send: ")
+        sender.send_message(message)
+
+if __name__ == "__main__":
+    main()
